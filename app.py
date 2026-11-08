@@ -241,27 +241,46 @@ def rate_ok(ip):
 
 def _post(url, headers, body):
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        try:
+            msg = json.loads(e.read().decode()).get("error", {}).get("message", "")
+        except Exception:  # noqa
+            msg = ""
+        raise RuntimeError("HTTP %s %s" % (e.code, msg[:220]))
+
+
+_good_model = []
 
 
 def call_ai(system, user):
-    """JSON döndürmesi istenen bir yapay zeka çağrısı. Önce Gemini, olmazsa Groq."""
-    err = None
+    """JSON döndürmesi istenen bir yapay zeka çağrısı. Önce Gemini (birkaç model adı dener), olmazsa Groq."""
+    errs = []
     if GEMINI_KEY:
-        try:
-            d = _post(
-                "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent" % GEMINI_MODEL,
-                {"Content-Type": "application/json", "x-goog-api-key": GEMINI_KEY},
-                {
-                    "systemInstruction": {"parts": [{"text": system}]},
-                    "contents": [{"role": "user", "parts": [{"text": user}]}],
-                    "generationConfig": {"responseMimeType": "application/json", "temperature": 0.7},
-                },
-            )
-            return parse_json(d["candidates"][0]["content"]["parts"][0]["text"])
-        except Exception as e:  # noqa
-            err = e
+        names = []
+        for m in _good_model + [GEMINI_MODEL, "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-lite-latest"]:
+            if m and m not in names:
+                names.append(m)
+        for m in names:
+            try:
+                d = _post(
+                    "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent" % m,
+                    {"Content-Type": "application/json", "x-goog-api-key": GEMINI_KEY},
+                    {
+                        "systemInstruction": {"parts": [{"text": system}]},
+                        "contents": [{"role": "user", "parts": [{"text": user}]}],
+                        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.7},
+                    },
+                )
+                out = parse_json(d["candidates"][0]["content"]["parts"][0]["text"])
+                _good_model[:] = [m]
+                return out
+            except Exception as e:  # noqa
+                errs.append("%s -> %s" % (m, e))
+                if "API key" in str(e) or "HTTP 401" in str(e) or "HTTP 403" in str(e):
+                    break
     if GROQ_KEY:
         try:
             d = _post(
@@ -276,8 +295,9 @@ def call_ai(system, user):
             )
             return parse_json(d["choices"][0]["message"]["content"])
         except Exception as e:  # noqa
-            err = e
-    raise RuntimeError(str(err) if err else "Yapay zeka kapalı")
+            errs.append("groq -> %s" % e)
+    print("AI HATASI:", errs, flush=True)
+    raise RuntimeError(" | ".join(errs) if errs else "Yapay zeka kapalı")
 
 
 def parse_json(t):
@@ -301,6 +321,18 @@ def ai_guard():
     if not rate_ok(ip):
         return jsonify({"error": "Çok hızlı gidiyoruz, biraz bekleyip tekrar dene."}), 429
     return None
+
+
+@app.route("/api/ai/test")
+def ai_test():
+    """Tarayıcıdan /api/ai/test açarak yapay zekanın çalışıp çalışmadığını (ve hatayı) görebilirsin."""
+    if not AI_ON:
+        return jsonify({"ok": False, "detail": "Anahtar tanımlı değil (GEMINI_API_KEY)"})
+    try:
+        out = call_ai("Reply with JSON only.", 'Return {"hello":"world"}')
+        return jsonify({"ok": True, "model": (_good_model or ["groq"])[0], "reply": out})
+    except Exception as e:  # noqa
+        return jsonify({"ok": False, "detail": str(e)[:600]})
 
 
 @app.route("/api/ai/examples", methods=["POST"])
@@ -327,7 +359,7 @@ def ai_examples():
     try:
         out = call_ai(system, user)
     except Exception as e:  # noqa
-        return jsonify({"error": "Yapay zeka şu an yanıt vermedi."}), 502
+        return jsonify({"error": "Yapay zeka şu an yanıt vermedi.", "detail": str(e)[:300]}), 502
     ids = {i["id"] for i in items}
     res = [{"id": x.get("id"), "s": clip(x.get("s"), 200), "t": clip(x.get("t"), 200)} for x in out.get("items", []) if x.get("id") in ids and x.get("s")]
     return jsonify({"items": res})
@@ -356,7 +388,7 @@ def ai_check():
     try:
         out = call_ai(system, user)
     except Exception as e:  # noqa
-        return jsonify({"error": "Yapay zeka şu an yanıt vermedi."}), 502
+        return jsonify({"error": "Yapay zeka şu an yanıt vermedi.", "detail": str(e)[:300]}), 502
     v = out.get("verdict")
     return jsonify({"verdict": v if v in ("good", "almost", "wrong") else "almost", "feedback": clip(out.get("feedback"), 400), "better": clip(out.get("better"), 240)})
 
