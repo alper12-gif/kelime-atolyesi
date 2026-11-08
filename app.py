@@ -239,10 +239,10 @@ def rate_ok(ip):
     return True
 
 
-def _post(url, headers, body):
+def _post(url, headers, body, timeout=10):
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=30) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         try:
@@ -258,12 +258,16 @@ _good_model = []
 def call_ai(system, user):
     """JSON döndürmesi istenen bir yapay zeka çağrısı. Önce Gemini (birkaç model adı dener), olmazsa Groq."""
     errs = []
+    deadline = time.time() + 22  # Render isteği 30 sn'de keser, bu yüzden toplam süreyi sınırla
     if GEMINI_KEY:
         names = []
         for m in _good_model + [GEMINI_MODEL, "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-lite-latest"]:
             if m and m not in names:
                 names.append(m)
-        for m in names:
+        for m in names[:4]:
+            if time.time() > deadline:
+                errs.append("zaman asimi")
+                break
             try:
                 d = _post(
                     "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent" % m,
@@ -281,7 +285,7 @@ def call_ai(system, user):
                 errs.append("%s -> %s" % (m, e))
                 if "API key" in str(e) or "HTTP 401" in str(e) or "HTTP 403" in str(e):
                     break
-    if GROQ_KEY:
+    if GROQ_KEY and time.time() < deadline + 6:
         try:
             d = _post(
                 "https://api.groq.com/openai/v1/chat/completions",
