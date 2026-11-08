@@ -205,7 +205,7 @@ const synNote=w=>synsOf(w).length?'<div class="small mut" style="margin:-6px 0 1
 /* yapay zeka istemcisi */
 const AI={on:false},TRIED=new Set();
 async function aiInit(){try{AI.on=!!(await (await fetch('/api/ai/status')).json()).enabled}catch(e){AI.on=false}if(VIEW==='home'||VIEW==='lib')render()}
-async function aiPost(p,b){const r=await fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error((j.error||'Yapay zekâya ulaşılamadı')+(j.detail?' ('+j.detail+')':''));return j}
+async function aiPost(p,b){const r=await fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error((j.error||'Sunucu yanıt vermedi (HTTP '+r.status+'). Bir dakika sonra tekrar dene.')+(j.detail?' ('+j.detail+')':''));return j}
 const exHTML=w=>w.ex?`<p class="ex">“${esc(w.ex)}”${w.exAI?'<span class="ai" title="Yapay zekâ üretti">AI</span>':''}${w.exTr?`<br><span class="small">${esc(w.exTr)}</span>`:''}</p>`:(AI.on&&!TRIED.has(w.id)?'<p class="ex small think">Örnek cümle hazırlanıyor<span>.</span><span>.</span><span>.</span></p>':'');
 async function prefetchEx(ids){
   if(!AI.on)return 0;const ws=ids.map(byId).filter(w=>w&&!w.ex&&!TRIED.has(w.id)).slice(0,12);if(!ws.length)return 0;
