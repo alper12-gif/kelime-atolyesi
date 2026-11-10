@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Caveat:wght@600&display=swap" rel="stylesheet">
 <style>
-:root{--paper:#f3f6fc;--grid:#e1e8f6;--sheet:#fff;--ink:#14213d;--mut:#4a5775;--line:#cfd9ee;--blue:#2b50d8;--blue-d:#1f3bb0;--bt:#2b50d8;--tint:#e8eefc;--hl:#ffe066;--red:#d8344a;--redb:#fdecef;--green:#1b8a57;--greenb:#e6f6ee;--rule:var(--rule);--margin:var(--margin);--pen:'Caveat',cursive;color-scheme:light}
+:root{--paper:#f3f6fc;--grid:#e1e8f6;--sheet:#fff;--ink:#14213d;--mut:#4a5775;--line:#cfd9ee;--blue:#2b50d8;--blue-d:#1f3bb0;--bt:#2b50d8;--tint:#e8eefc;--hl:#ffe066;--red:#d8344a;--redb:#fdecef;--green:#1b8a57;--greenb:#e6f6ee;--rule:#dfe6f5;--margin:#e58b9b;--pen:'Caveat',cursive;color-scheme:light}
 [data-theme=dark]{--paper:#0d1424;--grid:#161f36;--sheet:#17213b;--ink:#e9eefb;--mut:#a3b0cf;--line:#2b3a5f;--blue:#4b6df0;--blue-d:#3855d4;--bt:#93a9ff;--tint:#243157;--red:#ff7186;--redb:#3b1c29;--green:#4cd08e;--greenb:#16322a;--rule:#212d4e;--margin:#7d3b4b;color-scheme:dark}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -135,6 +135,35 @@ details summary{cursor:pointer;font-weight:700}
  nav button{flex:1;padding:14px 4px;border-bottom:0;margin:0;font-size:14px}nav button.on{background:var(--hl);color:var(--ink)}
  .method article{grid-template-columns:1fr;gap:4px}
 }
+/* ek animasyonlar */
+.btn,.opt,.pair,.chip,.tool,nav button{position:relative;overflow:hidden}
+.btn:hover{transform:translateY(-2px);box-shadow:0 3px 0 var(--ink)}
+.btn:active{transform:translateY(1px);box-shadow:none}
+.btn:disabled:hover{transform:none;box-shadow:none}
+.opt:hover,.pair:hover{transform:translateX(4px)}
+.opt:active,.pair:active{transform:scale(.98)}
+.chip{transition:transform .12s,background .15s}.chip:hover{transform:translateY(-2px)}
+.tool:active{transform:scale(.88) rotate(14deg)}
+.brand:hover i{animation:wig .5s}
+.rip{position:absolute;border-radius:50%;background:currentColor;opacity:.28;transform:scale(0);animation:rip .6s ease-out forwards;pointer-events:none}
+input:focus,textarea:focus,select:focus{box-shadow:0 0 0 4px var(--tint);transition:box-shadow .2s}
+#app.anim>*{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+#app.anim>*:nth-child(2){animation-delay:.07s}#app.anim>*:nth-child(3){animation-delay:.14s}#app.anim>*:nth-child(4){animation-delay:.21s}#app.anim>*:nth-child(5){animation-delay:.28s}#app.anim>*:nth-child(6){animation-delay:.35s}
+.cal i{animation:pop .4s both}
+.ladder i{transform-origin:left;animation:growX .8s cubic-bezier(.2,.8,.2,1) both}
+.stats>div{animation:pop .5s both}.stats>div:nth-child(2){animation-delay:.12s}.stats>div:nth-child(3){animation-delay:.24s}
+.list>div{transition:transform .15s,background .15s}.setrow:hover{transform:translateX(4px)}
+.chk.on{animation:pop .3s}
+.prog i{background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.22) 0 8px,transparent 8px 16px);background-size:22px 22px;animation:stripe 1s linear infinite}
+.turn{animation:turn .4s cubic-bezier(.2,.8,.2,1)}
+.wdots{display:flex;gap:8px;margin:2px 0 10px}.wdots i{width:16px;height:16px;border:2px solid var(--ink);border-radius:50%;background:var(--sheet)}.wdots i.on{background:var(--green);animation:pop .35s}
+input.okin{border-color:var(--green);background:var(--greenb);animation:ring .6s}
+#toast{transform:translate(-50%,16px)}#toast.show{transform:translate(-50%,0)}
+@keyframes rip{to{transform:scale(1);opacity:0}}
+@keyframes wig{25%{transform:rotate(-12deg)}75%{transform:rotate(10deg)}}
+@keyframes growX{from{transform:scaleX(0)}}
+@keyframes stripe{to{background-position:22px 0}}
+@keyframes turn{from{transform:perspective(600px) rotateX(-80deg);opacity:0}to{transform:none;opacity:1}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.hl{background-size:100% 100%}}
 </style>
 </head>
@@ -158,7 +187,7 @@ const speaker='<svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill=
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),2400)}
 function load(){
   try{DB=JSON.parse(localStorage.getItem(KEY))}catch(e){DB=null}
-  DB=DB||{};DB.words=DB.words||[];DB.sets=DB.sets||[];DB.sel=DB.sel||[];DB.newPerDay=DB.newPerDay||10;DB.log=DB.log||{};
+  DB=DB||{};DB.words=DB.words||[];DB.sets=DB.sets||[];DB.sel=DB.sel||[];DB.newPerDay=DB.newPerDay||10;DB.writeN=DB.writeN==null?5:DB.writeN;DB.log=DB.log||{};
   DB.sel=DB.sel.filter(id=>DB.sets.some(s=>s.id===id));
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){toast('Kaydedilemedi: tarayıcı depolaması dolu.')}}
@@ -181,6 +210,7 @@ function sfx(n,combo){if(DB.mute)return;const k=Math.pow(1.0595,Math.min(combo||
    master:()=>[784,988,1319,1568].forEach((f,i)=>tone(f,i*.07,.38,'sine',.15))};
   if(m[n])m[n]()}
 document.addEventListener('click',e=>{if(e.target.closest('.btn,.chip,.setrow,nav button,.tool,.brand'))sfx('tap')});
+document.addEventListener('pointerdown',e=>{const b=e.target.closest('.btn,.opt,.pair,.chip,.tool,nav button');if(!b||b.disabled||RM())return;const q=b.getBoundingClientRect(),z=Math.max(q.width,q.height)*2,p=document.createElement('span');p.className='rip';p.style.cssText=`width:${z}px;height:${z}px;left:${e.clientX-q.left-z/2}px;top:${e.clientY-q.top-z/2}px`;b.appendChild(p);p.onanimationend=()=>p.remove()});
 function burst(el,n){if(RM()||!el||!el.animate)return;const r=el.getBoundingClientRect(),cx=r.left+Math.min(r.width/2,160),cy=r.top+Math.min(r.height/2,40),cols=['#ffe066','#2b50d8','#1b8a57','#d8344a','#ffffff'];
   for(let i=0;i<n;i++){const p=document.createElement('i');p.className='pt';p.style.cssText=`left:${cx}px;top:${cy}px;background:${cols[i%5]};border:1.5px solid #14213d`;document.body.appendChild(p);
    const a=Math.random()*Math.PI*2,d=70+Math.random()*120;p.animate([{transform:'translate(0,0) rotate(0)',opacity:1},{transform:`translate(${Math.cos(a)*d}px,${Math.sin(a)*d+50}px) rotate(${Math.random()*600}deg)`,opacity:0}],{duration:750+Math.random()*450,easing:'cubic-bezier(.2,.8,.3,1)'}).onfinish=()=>p.remove()}}
@@ -233,7 +263,7 @@ async function checkSentence(){
   const b=$('#sbtn');b.disabled=true;b.innerHTML='Kontrol ediliyor<span class="think"><span>.</span><span>.</span><span>.</span></span>';$('#sen').disabled=true;
   try{const r=await aiPost('/api/ai/check',{en:w.en,tr:w.tr,sentence:v});
     const k=r.verdict==='good'?'ok':r.verdict==='almost'?'near':'bad',lab={ok:'Çok iyi',near:'Neredeyse',bad:'Düzeltelim'}[k],col={ok:'var(--green)',near:'#a86a00',bad:'var(--red)'}[k];
-    sfx(k==='ok'?'master':k==='near'?'near':'bad');
+    sfx(k==='ok'?'master':k==='near'?'near':'bad');if(k==='bad'){S.badN++;S.missed.add(w.id);logDay(false)}else{S.okN++;logDay(true)}save();
     $('#fb').innerHTML=`<div class="fb ${k}"><b style="color:${col}">${lab}</b><div style="margin-top:4px">${esc(r.feedback)}</div>${r.better?`<div class="pen">${esc(r.better)}</div>`:''}</div><p style="margin:16px 0 0"><button class="btn" id="nextBtn" onclick="next()">Devam</button></p>`;
     b.parentElement.style.display='none';if(k==='ok')burst($('#fb'),22);
   }catch(e){$('#fb').innerHTML=`<div class="fb bad"><b style="color:var(--red)">Şu an kontrol edemedim.</b><div class="small">${esc(e.message)}</div></div><p style="margin:16px 0 0"><button class="btn" id="nextBtn" onclick="next()">Devam</button></p>`;b.parentElement.style.display='none'}}
@@ -253,7 +283,7 @@ function go(v){if(S&&S.timer)clearTimeout(S.timer);VIEW=v;S=null;EDIT=null;rende
 function render(){
   const tabs=[['home','Bugün'],['lib','Defter'],['upload','Ekle'],['method','Yöntem']];
   $('#nav').innerHTML=tabs.map(t=>`<button class="${VIEW===t[0]?'on':''}" onclick="go('${t[0]}')">${t[1]}</button>`).join('');
-  updateTools();({home:vHome,upload:vUpload,lib:vLib,method:vMethod}[VIEW])();
+  updateTools();$('#app').className='anim';({home:vHome,upload:vUpload,lib:vLib,method:vMethod}[VIEW])();
   window.scrollTo(0,0);
 }
 
@@ -274,7 +304,7 @@ function vHome(){
   const dt=new Intl.DateTimeFormat('tr-TR',{weekday:'long',day:'numeric',month:'long'}).format(new Date());
   const L=s.lad,tot=L.reduce((a,b)=>a+b,0)||1,cols=['var(--sheet)','#c5d3fa','#7f9bee','#ffe066'],names=['Yeni','Öğreniliyor','Pekişiyor','Pekişti'];
   const mx=Math.max(1,...s.fc),dn=['Bugün','Yarın'];
-  const days=[];for(let i=34;i>=0;i--){const n=(DB.log[s.t-i]||{n:0}).n;days.push(`<i class="${n>=30?'t3':n>=10?'t2':n>0?'t1':''} ${i===0?'now':''}" title="${n} cevap"></i>`)}
+  const days=[];for(let i=34;i>=0;i--){const n=(DB.log[s.t-i]||{n:0}).n;days.push(`<i class="${n>=30?'t3':n>=10?'t2':n>0?'t1':''} ${i===0?'now':''}" style="animation-delay:${(34-i)*14}ms" title="${n} cevap"></i>`)}
   $('#app').innerHTML=`
   <div class="cols"><div>
    <p class="mut" style="margin:0 0 4px">${dt}</p>
@@ -307,12 +337,13 @@ function vHome(){
    </div></div>
 
   <div class="section"><details><summary>Ayarlar ve yedek</summary><div style="margin-top:12px">
-   <div class="row"><label for="npd">Günlük yeni kelime sayısı</label><input id="npd" type="number" min="1" max="50" value="${DB.newPerDay}" style="width:90px" onchange="DB.newPerDay=Math.max(1,+this.value||10);save();vHome()"></div>
+   <div class="row"><label for="npd">Günlük yeni kelime sayısı</label><input id="npd" type="number" min="1" max="50" value="${DB.newPerDay}" style="width:90px" onchange="DB.newPerDay=Math.max(1,+this.value||10);save();$('#app').className='';vHome()"></div>
+   <div class="row" style="margin-top:12px"><label for="wn">Yeni kelimede yazma sayısı (0 = kapalı)</label><input id="wn" type="number" min="0" max="10" value="${DB.writeN}" style="width:90px" onchange="DB.writeN=Math.max(0,Math.min(10,Math.round(+this.value||0)));save()"></div>
    <div style="margin-top:16px"><b>Yapay zekâ</b> <span class="tag ${AI.on?'k':'n'}">${AI.on?'Açık':'Kapalı'}</span>${AI.on?`<label class="row small" style="margin-top:6px"><input type="checkbox" ${DB.aiTasks!==false?'checked':''} onchange="DB.aiTasks=this.checked;save()"> Turlara kısa cümle kurma görevleri ekle</label>`:'<p class="small mut" style="margin:4px 0 0">Sunucuya GEMINI_API_KEY eklenince açılır.</p>'}</div>
    <div class="row" style="margin-top:12px"><button class="btn line sm" onclick="exportDB()">Yedek indir</button><label class="btn line sm" style="cursor:pointer">Yedek yükle<input type="file" accept=".json" hidden onchange="importDB(this.files[0])"></label></div>
    <p class="small mut">İlerlemen bu cihazın tarayıcısında saklanır. Tarayıcı verisini silersen kaybolur, bu yüzden ara sıra yedek indir.</p></div></details></div>`;countUp();
 }
-function toggleSel(id){const i=DB.sel.indexOf(id);i<0?DB.sel.push(id):DB.sel.splice(i,1);save();vHome()}
+function toggleSel(id){const i=DB.sel.indexOf(id);i<0?DB.sel.push(id):DB.sel.splice(i,1);save();$('#app').className='';vHome()}
 function exportDB(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB)],{type:'application/json'}));a.download='kelime-yedek-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
 function importDB(f){if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.words)throw 0;DB=d;load();save();toast('Yedek yüklendi');go('home')}catch(e){toast('Geçersiz yedek dosyası')}};r.readAsText(f)}
 
@@ -385,7 +416,8 @@ function vMethod(){
   const A=[
   ['Aralıklı geri çağırma','Bir kelimeyi unutmaya yaklaşırken hatırlamaya çalışmak, art arda çalışmaktan çok daha kalıcıdır. Latimier ve arkadaşlarının 2021 meta-analizinde aralıklı geri çağırma, yığın çalışmaya göre belirgin üstün çıktı (g = 0,74). Aralıkların giderek açılması ile eşit aralıklı olmak arasında anlamlı fark bulunmadı; önemli olan aralığın var olması. Dil öğrenimi için Kim ve Webb (2022) benzer sonucu 37 deneyde doğruladı.','Sitede: doğru bildikçe kelime 1, 2, 4, 8, 16, 32 gün sonra geri gelir. Yanlışsa aynı gün tekrar sorulur.'],
   ['Kendini sınama','Cevabı okumak yerine kendini sınamak öğrenmeyi artırır. Sınıf ortamı çalışmalarında etki yaklaşık yarım standart sapma (g = 0,50) bulundu (Yang ve ark., 2021; Rowland, 2014).','Sitede: cevap önce senden istenir, kart ancak sen denedikten sonra döner.'],
-  ['Başarana kadar tekrar ve geri bildirim','Hata yapıldığında doğru cevabı görmek ve kelimeyi aynı oturumda doğru hatırlayana kadar tekrar etmek (başarıya ulaşana dek yeniden öğrenme) kalıcılığı artırır; kriter yükseldikçe kazanç artar ama getiri azalır (Pyc ve Rawson, 2009; Nakata, 2017).','Sitede: yeni kelime aynı turda iki kez doğru hatırlanmalı, önce seçmeli, sonra yazarak. Yanlış kelime birkaç kart sonra tekrar gelir.'],
+  ['Başarana kadar tekrar ve geri bildirim','Hata yapıldığında doğru cevabı görmek ve kelimeyi aynı oturumda doğru hatırlayana kadar tekrar etmek (başarıya ulaşana dek yeniden öğrenme) kalıcılığı artırır; kriter yükseldikçe kazanç artar ama getiri azalır (Pyc ve Rawson, 2009; Nakata, 2017).','Sitede: yeni kelime aynı turda üç kez doğru hatırlanmalı: önce seçmeli, sonra yazarak, sonra dinleyip yazarak. Yanlış kelime birkaç kart sonra tekrar gelir.'],
+  ['Yazarak üretme','İlk karşılaşmada kelimeyi sadece görmek yetmez. Önce bakarak, sonra bakmadan yazmak kelimeyi aktif üretmeni sağlar; üretme etkisi (Slamecka ve Graf, 1978) bunu destekler. Kaç kez yazman gerektiğinin tek bir doğru sayısı yok, bu yüzden ayarlardan değiştirebilirsin.','Sitede: yeni kelimede önce bakarak, sonra bakmadan birkaç kez yazarsın.'],
   ['Zorlaşan sorular','Tanımak, üretmekten kolaydır. Kelimeyi yazmak ve duyduğunu yazmak, daha çok emek gerektirdiği için daha kalıcı iz bırakır (Bjork ve Bjork, "istenen zorluklar").','Sitede: yeni kelime seçmeli başlar; bildikçe yazma, cümlede tamamlama ve dinleyip yazmaya geçer.'],
   ['Karışık çalışma','Konuları ve soru türlerini karıştırmak, tek türü bloklar halinde çalışmaktan daha iyi sonuç verir (Brunmair ve Richter, 2019; g = 0,42).','Sitede: tüm defterlerden kelimeler ve farklı soru türleri karışık gelir.'],
   ['Kendi hafıza bağın','Görsel ya da ses benzerliğine dayanan ipuçları ilk günlerde hatırlamayı kolaylaştırır, ancak tekrar edilmezse hızlı unutulur (Wang ve Thomas, 1992-1995). Öğrencilerin kendi ürettiği ipuçları hazır verilenlerden daha iyi sonuç verdi (ETR&D, 2004). Bu yüzden ipucu yalnızca başlangıç desteğidir, asıl iş tekrarlardır.','Sitede: yeni kelimede kendi ipucunu yazarsın, ama kelimeler ipucundan bağımsız olarak aralıklı sorulur.']];
@@ -396,7 +428,7 @@ function vMethod(){
 
 /* ===== ÇALIŞMA MOTORU ===== */
 function stage(html){
-  VIEW='study';
+  VIEW='study';$('#app').className='';
   const left=S.q.length+S.intros.length+S.batches.reduce((a,b)=>a+b.length,0);
   const pct=S.total?Math.round((1-left/S.total)*100):0;
   $('#nav').innerHTML=`<button onclick="if(confirm('Turdan çıkılsın mı? Şu ana kadarki ilerlemen kayıtlı.'))go('home')">Turdan çık</button>`;
@@ -411,7 +443,7 @@ function startSmart(){
   if(!due.length&&!fresh.length){toast('Bugünlük hepsi tamam. Serbest pratik yapabilirsin.');return}
   const batches=[];for(let i=0;i<fresh.length;i+=5)batches.push(fresh.slice(i,i+5).map(w=>w.id));
   if(AI.on)prefetchEx(due.filter(w=>w.box>=2&&!w.ex).map(w=>w.id));
-  S={mode:'smart',q:shuffle(due).map(w=>({id:w.id,fails:0,need:1})),intros:[],batches,total:due.length+fresh.length*2,okN:0,badN:0,missed:new Set()};
+  S={mode:'smart',q:shuffle(due).map(w=>({id:w.id,fails:0,need:1})),intros:[],batches,total:due.length+fresh.length*3,okN:0,badN:0,missed:new Set()};
   next();
 }
 function startPractice(mode,hard){
@@ -447,11 +479,32 @@ function renderIntro(w){
   <p class="small mut" style="margin:6px 0">Kelimeyi bir kez yüksek sesle söyle ve anlamını zihninde canlandır. Sonra turda seni test edeceğim.</p>
   ${noteBox(w)}<p style="margin:16px 0 0"><button class="btn big" id="nextBtn" onclick="introDone()">Devam</button></p>`);
 }
-function introDone(){const id=S.intros.shift(),w=byId(id);w.intro=today();w.due=today();save();S.q.push({id,fails:0,isNew:true,need:2,stage:0});next()}
+function introDone(){const id=S.intros.shift(),w=byId(id);w.intro=today();w.due=today();save();S.q.push({id,fails:0,isNew:true,need:3,stage:0});if(DB.writeN>0){S.wr={id,n:0,total:DB.writeN};renderWrite()}else next()}
+function renderWrite(){
+  const W=S.wr,w=byId(W.id),vis=Math.ceil(W.total*.6),show=W.n<vis;W.h=0;
+  const dots=Array.from({length:W.total},(_,i)=>`<i class="${i<W.n?'on':''}"></i>`).join('');
+  stage(`<div class="q">Yazarak pekiştir, ${W.n+1}/${W.total}</div><div class="wdots" aria-hidden="true">${dots}</div>`+
+   (show?`<div class="q">Kelimeye bakarak yaz</div><div class="word">${esc(w.en)}</div><div class="tr" style="font-size:22px">${esc(w.tr)}</div>`
+        :`<div class="q">Şimdi bakmadan yaz</div><div class="word">${esc(w.tr)}</div>`)+
+   `<div id="hint" class="hintline" aria-live="polite"></div><input type="text" id="ans" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Yaz" placeholder="Yaz ve Enter'a bas">
+   <div class="row" style="margin-top:12px"><button class="btn" onclick="checkWrite()">Kontrol et</button><button class="btn line" onclick="say(byId('${w.id}').en)">${speaker} Dinle</button>${show?'':'<button class="btn line" onclick="writeHint()">İpucu</button>'}</div><div id="fb"></div>`);
+  $('#ans').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation();checkWrite()}});
+  say(w.en)}
+function writeHint(){const W=S.wr;W.h++;$('#hint').textContent=hintStr(byId(W.id),W.h);$('#ans').focus()}
+function checkWrite(){
+  const W=S.wr,w=byId(W.id),a=$('#ans');if(!a||a.disabled)return;const v=norm(a.value);if(!v)return;
+  if(variants(w.en).includes(v)){
+    W.n++;a.disabled=true;a.classList.add('okin');sfx('ok',W.n);burst(a,8);
+    const d=document.querySelectorAll('.wdots i')[W.n-1];if(d)d.classList.add('on');
+    S.timer=setTimeout(()=>{if(W.n>=W.total){S.wr=null;next()}else renderWrite()},420);
+  }else{
+    sfx('bad');const st=$('#stage');st.classList.remove('enter');st.classList.add('shake');setTimeout(()=>st.classList.remove('shake'),450);
+    $('#fb').innerHTML=`<div class="fb bad"><b style="color:var(--red)">Tam olmadı.</b><div class="pen">${esc(w.en)}</div></div>`;a.value='';a.focus()}
+}
 function exType(w,it){
   const m=S.mode,cz=hasCloze(w);
   if(m==='smart'){
-    if(it.isNew)return it.failed?'mc_tr':(it.stage?'type':'mc_en');
+    if(it.isNew)return it.failed?'mc_tr':(it.stage===0?'mc_en':it.stage===1?'type':'listen');
     if(w.box<=1||(it.failed&&w.box<2))return'mc_tr';
     if(w.box<4)return cz&&Math.random()<.5?'cloze':'type';
     return pick(cz?['listen','type','cloze']:['listen','type']);
@@ -505,7 +558,7 @@ function pickMC(i){
 function submitTyped(){const it=S.cur,w=byId(it.id),v=$('#ans').value;if(!v.trim())return;const r=checkTyped(v,w);$('#ans').disabled=true;say(w.en);feedback(r,w)}
 function giveUp(){SYN=null;const w=byId(S.cur.id);const a=$('#ans');if(a)a.disabled=true;say(w.en);feedback('bad',w,true)}
 function flipCard(){
-  const w=byId(S.cur.id);if($('#fb').innerHTML)return;say(w.en);$('#flip').onclick=null;
+  const w=byId(S.cur.id);if($('#fb').innerHTML)return;say(w.en);$('#flip').onclick=null;$('#flip').classList.add('turn');
   $('#flip').innerHTML=`<div class="q">${esc(w.tr)}</div><div class="word"><span class="hl">${esc(w.en)}</span></div>${w.ex?`<p class="ex">“${esc(w.ex)}”</p>`:''}`;
   $('#fb').innerHTML=`<div class="row" style="margin-top:14px"><button class="btn warn grow" onclick="gradeNow(false)">Hatırlayamadım</button><button class="btn grow" onclick="gradeNow(true)">Hatırladım</button></div>`;
 }
@@ -514,7 +567,7 @@ function feedback(kind,w,gaveUp){
   const ok=kind==='ok',it=S.cur;applyGrade(ok,it.hinted&&ok);
   const up=S.lvl;S.lvl=false;let msg;
   if(ok){
-    const syn=SYN&&SYN.id!==w.id?SYN:null,cb=S.combo>=3;
+    const syn=SYN&&SYN.id!==w.id?SYN:null,cb=S.combo>=5&&S.combo%5===0;
     msg=`<b style="color:var(--green)">${cb?'Doğru, '+S.combo+' üst üste!':'Doğru.'}</b> <span class="hl" style="animation-delay:0s">${esc(w.en)}</span> = ${esc(w.tr)}`
      +(syn?`<div class="small mut">Yazdığın “${esc(syn.en)}” de aynı anlama geliyor, o da doğru. Sorulan kelime “${esc(w.en)}” idi.</div>`:'')
      +(it.hinted?'<div class="small mut">İpucu kullandığın için yarın tekrar gelecek.</div>':'')
@@ -524,9 +577,9 @@ function feedback(kind,w,gaveUp){
   else{msg=`<b style="color:var(--red)">${gaveUp?'Cevap':'Doğrusu'}</b><div class="pen">${esc(w.en)} = ${esc(w.tr)}</div>`;sfx('bad')}
   const exh=w.ex?`<div class="ex" style="margin:8px 0 0">“${esc(w.ex)}”</div>`:'';
   if(ok){
-    $('#fb').innerHTML=`<div class="fb ok">${msg}${exh}</div><div class="auto" style="animation-duration:${(w.ex?1.7:1.15)+(up?.5:0)}s"></div><p style="margin:10px 0 0"><button class="btn line sm" id="nextBtn" onclick="next()">Hemen geç</button></p>`;
+    $('#fb').innerHTML=`<div class="fb ok">${msg}</div>`;
     burst($('#fb'),up?38:cb?20:12);
-    S.timer=setTimeout(next,((w.ex?1.7:1.15)+(up?.5:0))*1000);
+    S.timer=setTimeout(next,up?1100:450);
   }else{
     const st=$('#stage');st.classList.remove('enter');st.classList.add('shake');setTimeout(()=>st.classList.remove('shake'),450);
     $('#fb').innerHTML=`<div class="fb ${kind}">${msg}${exh}<div class="small mut" style="margin-top:6px">Bu kelime birazdan yeniden sorulacak.</div></div>${noteBox(w)}<p style="margin:16px 0 0"><button class="btn" id="nextBtn" onclick="next()">Devam</button></p>`;
@@ -548,9 +601,9 @@ function applyGrade(ok,hinted){
 function finish(){
   const tot=S.okN+S.badN,pct=tot?Math.round(S.okN/tot*100):0,t=today();
   const miss=[...S.missed].map(byId).filter(Boolean),tom=DB.words.filter(w=>w.intro&&w.due===t+1).length;
-  stage(`<h1 style="margin-bottom:12px">Tur bitti</h1><div class="stats"><div><b>%${pct}</b><span class="mut">doğruluk</span></div><div><b>${S.okN}</b><span class="mut">doğru</span></div><div><b>${S.badN}</b><span class="mut">yanlış</span></div></div>
+  stage(`<h1 style="margin-bottom:12px">Tur bitti</h1>${tot?`<div class="stats"><div><b>%${pct}</b><span class="mut">doğruluk</span></div><div><b>${S.okN}</b><span class="mut">doğru</span></div><div><b>${S.badN}</b><span class="mut">yanlış</span></div></div>`:'<p class="mut">Bu turda soru cevaplanmadı.</p>'}
   ${tom?`<p class="mut">Yarın ${tom} kelime tekrar için sırada.</p>`:''}
-  ${miss.length?`<h3 style="margin-top:16px">Takıldığın kelimeler</h3><div class="tbl"><table>${miss.map(w=>`<tr><td><b>${esc(w.en)}</b> <a href="#" onclick="say(byId('${w.id}').en);return false" aria-label="Dinle">${speaker}</a></td><td>${esc(w.tr)}</td></tr>`).join('')}</table></div>`:'<p style="font-weight:600">Hiç yanlışın yok.</p>'}
+  ${miss.length?`<h3 style="margin-top:16px">Takıldığın kelimeler</h3><div class="tbl"><table>${miss.map(w=>`<tr><td><b>${esc(w.en)}</b> <a href="#" onclick="say(byId('${w.id}').en);return false" aria-label="Dinle">${speaker}</a></td><td>${esc(w.tr)}</td></tr>`).join('')}</table></div>`:(tot?'<p style="font-weight:600">Hiç yanlışın yok.</p>':'')}
   <div class="row" style="margin-top:18px"><button class="btn" onclick="go('home')">Ana sayfa</button>${S.mode==='match'?'<button class="btn line" onclick="startMatch()">Tekrar oyna</button>':S.mode!=='smart'?`<button class="btn line" onclick="startPractice('${S.mode}')">Bir tur daha</button>`:''}</div>`);
   $('#nav').innerHTML='';sfx('done');if(pct>=70)setTimeout(()=>burst($('#stage'),44),250);
 }
