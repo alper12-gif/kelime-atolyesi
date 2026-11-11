@@ -136,6 +136,7 @@ details summary{cursor:pointer;font-weight:700}
  .method article{grid-template-columns:1fr;gap:4px}
 }
 /* ek animasyonlar */
+button,input,select,textarea{touch-action:manipulation}
 .btn,.opt,.pair,.chip,.tool,nav button{position:relative;overflow:hidden}
 .btn:hover{transform:translateY(-2px);box-shadow:0 3px 0 var(--ink)}
 .btn:active{transform:translateY(1px);box-shadow:none}
@@ -428,7 +429,7 @@ function vMethod(){
 
 /* ===== ÇALIŞMA MOTORU ===== */
 function stage(html){
-  VIEW='study';$('#app').className='';
+  VIEW='study';$('#app').className='';S.lock=false;
   const left=S.q.length+S.intros.length+S.batches.reduce((a,b)=>a+b.length,0);
   const pct=S.total?Math.round((1-left/S.total)*100):0;
   $('#nav').innerHTML=`<button onclick="if(confirm('Turdan çıkılsın mı? Şu ana kadarki ilerlemen kayıtlı.'))go('home')">Turdan çık</button>`;
@@ -454,7 +455,7 @@ function startPractice(mode,hard){
   else{const learnt=pool.filter(w=>w.intro);pool=shuffle(learnt.length>=5?learnt:pool).sort((a,b)=>(a.due<=t?0:1)-(b.due<=t?0:1)||a.box-b.box)}
   pool=pool.slice(0,mode==='mix'?20:mode==='sentence'?6:15);
   if(!pool.length){toast(hard?'Henüz yanlış yaptığın kelime yok.':mode==='cloze'?'Örnek cümlesi olan kelime yok.'+(AI.on?' Defter sekmesinden yapay zekâyla üretebilirsin.':''):'Önce kelime ekle.');return}
-  pool.forEach(w=>{if(!w.intro){w.intro=t;w.due=t}});save();
+  save();
   S={mode,q:shuffle(pool).map(w=>({id:w.id,fails:0,need:1})),intros:[],batches:[],total:pool.length,okN:0,badN:0,missed:new Set()};
   next();
 }
@@ -542,29 +543,29 @@ function renderEx(it){
 }
 document.addEventListener('keydown',e=>{
   if(VIEW!=='study'||!S)return;const tag=document.activeElement.tagName;
-  if(e.key==='Enter'){const b=$('#nextBtn');if(b&&tag!=='TEXTAREA'&&tag!=='INPUT'){e.preventDefault();b.click()}}
+  if(e.key==='Enter'){if(e.repeat){e.preventDefault();return}const b=$('#nextBtn');if(b&&tag!=='TEXTAREA'&&tag!=='INPUT'){e.preventDefault();b.click()}}
   else if(/^[1-4]$/.test(e.key)&&$('.opt')&&!$('.opt.good')&&tag!=='TEXTAREA'&&tag!=='INPUT'){const o=document.querySelectorAll('.opt')[+e.key-1];if(o)o.click()}
 });
-function hint(){const w=byId(S.cur.id);S.cur.hints++;S.cur.hinted=true;
+function hint(){if(S.lock)return;const w=byId(S.cur.id);S.cur.hints++;S.cur.hinted=true;
   $('#hint').textContent=S.cur.t==='listen'&&S.cur.hints===1?w.tr:hintStr(w,S.cur.t==='listen'?S.cur.hints-1:S.cur.hints);
   if(S.cur.t==='listen'&&S.cur.hints>1)$('#hint').style.letterSpacing='.35em';else if(S.cur.t==='listen')$('#hint').style.letterSpacing='0';
   $('#ans').focus()}
 function pickMC(i){
-  if($('.opt.good')||$('.opt.wrong'))return;
+  if(S.lock||$('.opt.good')||$('.opt.wrong'))return;
   SYN=null;const it=S.cur,w=byId(it.id),field=it.t==='mc_en'?'tr':'en',ok=it.opts[i]===w[field];
   document.querySelectorAll('.opt').forEach((b,k)=>{if(it.opts[k]===w[field])b.classList.add('good');else if(k===i)b.classList.add('wrong')});
   if(it.t==='mc_tr')say(w.en);feedback(ok?'ok':'bad',w);
 }
-function submitTyped(){const it=S.cur,w=byId(it.id),v=$('#ans').value;if(!v.trim())return;const r=checkTyped(v,w);$('#ans').disabled=true;say(w.en);feedback(r,w)}
-function giveUp(){SYN=null;const w=byId(S.cur.id);const a=$('#ans');if(a)a.disabled=true;say(w.en);feedback('bad',w,true)}
+function submitTyped(){if(S.lock)return;const it=S.cur,w=byId(it.id),v=$('#ans').value;if(!v.trim())return;const r=checkTyped(v,w);$('#ans').disabled=true;say(w.en);feedback(r,w)}
+function giveUp(){if(S.lock)return;SYN=null;const w=byId(S.cur.id);const a=$('#ans');if(a)a.disabled=true;say(w.en);feedback('bad',w,true)}
 function flipCard(){
   const w=byId(S.cur.id);if($('#fb').innerHTML)return;say(w.en);$('#flip').onclick=null;$('#flip').classList.add('turn');
   $('#flip').innerHTML=`<div class="q">${esc(w.tr)}</div><div class="word"><span class="hl">${esc(w.en)}</span></div>${w.ex?`<p class="ex">“${esc(w.ex)}”</p>`:''}`;
   $('#fb').innerHTML=`<div class="row" style="margin-top:14px"><button class="btn warn grow" onclick="gradeNow(false)">Hatırlayamadım</button><button class="btn grow" onclick="gradeNow(true)">Hatırladım</button></div>`;
 }
-function gradeNow(ok){sfx(ok?'ok':'bad',S.combo);applyGrade(ok,false);next()}
+function gradeNow(ok){if(S.lock)return;S.lock=true;sfx(ok?'ok':'bad',S.combo);applyGrade(ok,false);next()}
 function feedback(kind,w,gaveUp){
-  const ok=kind==='ok',it=S.cur;applyGrade(ok,it.hinted&&ok);
+  if(S.lock)return;S.lock=true;const ok=kind==='ok',it=S.cur;applyGrade(ok,it.hinted&&ok);
   const up=S.lvl;S.lvl=false;let msg;
   if(ok){
     const syn=SYN&&SYN.id!==w.id?SYN:null,cb=S.combo>=5&&S.combo%5===0;
@@ -590,10 +591,10 @@ function applyGrade(ok,hinted){
   if(ok){w.ok++;S.okN++;S.combo=(S.combo||0)+1;
     if(it.need>1){S.q.splice(Math.min(S.q.length,4+Math.floor(Math.random()*3)),0,{id:it.id,fails:it.fails,failed:it.failed,isNew:it.isNew,need:it.need-1,stage:(it.stage||0)+1})}
     else{if(!it.failed)S.good.add(w.id);
-      if(!it.failed&&(S.mode==='smart'||w.due<=t||w.box===0)){const b0=w.box;if(hinted)w.due=t+1;else{w.box=Math.min(6,w.box+1);w.due=t+INT[w.box]}if(b0<4&&w.box>=4)S.lvl=true}}
+      if(w.intro&&!it.failed&&(S.mode==='smart'||w.due<=t||w.box===0)){const b0=w.box;if(hinted)w.due=t+1;else{w.box=Math.min(6,w.box+1);w.due=t+INT[w.box]}if(b0<4&&w.box>=4)S.lvl=true}}
   }else{
     w.bad++;S.badN++;S.missed.add(w.id);S.combo=0;
-    if(!it.failed){w.box=Math.max(0,w.box-2);w.due=t}
+    if(w.intro&&!it.failed){w.box=Math.max(0,w.box-2);w.due=t}
     S.q.splice(Math.min(S.q.length,3),0,{id:it.id,fails:(it.fails||0)+1,failed:true,isNew:it.isNew,need:Math.min(it.need||1,2),stage:it.stage||0});
   }
   save();
@@ -611,7 +612,7 @@ function finish(){
 /* ===== EŞLEŞTİRME ===== */
 function startMatch(){
   const t=today(),pool=shuffle(scope()).slice(0,18);if(pool.length<4){toast('Eşleştirme için en az 4 kelime gerekli');return}
-  pool.forEach(w=>{if(!w.intro){w.intro=t;w.due=t}});
+  
   S={mode:'match',rounds:[],q:[],intros:[],batches:[],total:pool.length,okN:0,badN:0,missed:new Set(),t0:Date.now(),done:0};
   for(let i=0;i<pool.length;i+=6)S.rounds.push(pool.slice(i,i+6).map(w=>w.id));
   matchRound();
@@ -629,11 +630,11 @@ function mPick(b){
   const a=m.sel;m.sel=null;a.classList.remove('sel');const w=byId(a.dataset.id);
   if(a.dataset.id===b.dataset.id){
     a.classList.add('done');b.classList.add('done');m.left--;S.done++;sfx('ok');
-    if(!m.wrong.has(w.id)){w.ok++;S.okN++;logDay(true);if(w.due<=today()||w.box===0){w.box=Math.min(6,w.box+1);w.due=today()+INT[w.box]}}
+    if(!m.wrong.has(w.id)){w.ok++;S.okN++;logDay(true);if(w.intro&&(w.due<=today()||w.box===0)){w.box=Math.min(6,w.box+1);w.due=today()+INT[w.box]}}
     save();if(!m.left)setTimeout(matchRound,350);
   }else{
     a.classList.add('err');b.classList.add('err');sfx('bad');setTimeout(()=>{a.classList.remove('err');b.classList.remove('err')},450);
-    [a,b].forEach(x=>{const ww=byId(x.dataset.id);if(!m.wrong.has(ww.id)){m.wrong.add(ww.id);ww.bad++;S.badN++;S.missed.add(ww.id);logDay(false);ww.box=Math.max(0,ww.box-1);ww.due=today()}});save();
+    [a,b].forEach(x=>{const ww=byId(x.dataset.id);if(!m.wrong.has(ww.id)){m.wrong.add(ww.id);ww.bad++;S.badN++;S.missed.add(ww.id);logDay(false);if(ww.intro){ww.box=Math.max(0,ww.box-1);ww.due=today()}}});save();
   }
 }
 load();render();aiInit();
