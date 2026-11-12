@@ -136,6 +136,9 @@ details summary{cursor:pointer;font-weight:700}
  .method article{grid-template-columns:1fr;gap:4px}
 }
 /* ek animasyonlar */
+tr.unsure td{background:rgba(255,224,102,.2)}tr.unsure td input{border-color:#d99200}
+td .alts{margin:6px 0 0}td .chip{padding:2px 10px;font-size:13px}
+td input[type=checkbox]{width:20px;height:20px;padding:0}
 button,input,select,textarea{touch-action:manipulation}
 .btn,.opt,.pair,.chip,.tool,nav button{position:relative;overflow:hidden}
 .btn:hover{transform:translateY(-2px);box-shadow:0 3px 0 var(--ink)}
@@ -350,32 +353,76 @@ function importDB(f){if(!f)return;const r=new FileReader();r.onload=()=>{try{con
 
 /* ===== EKLE ===== */
 function vUpload(){
-  $('#app').innerHTML=`<h1>Kelime ekle</h1><p class="mut" style="max-width:560px;font-size:18px">Word (.docx) ya da PDF listesi yükle. Kelimeler ayıklanır, sen kontrol edip kaydedersin. Her dosya ayrı bir defter olur.</p>
-  <div class="drop" id="drop"><p style="margin:0 0 12px;font-weight:600">Dosyaları buraya bırak ya da seç</p><input type="file" id="files" multiple accept=".docx,.pdf" onchange="doUpload(this.files)"></div>
+  $('#app').innerHTML=`<h1>Kelime ekle</h1><p class="mut" style="max-width:560px;font-size:18px">Word (.docx), PDF ya da fotoğraf (.jpg, .png) yükle. Kelimeler ayıklanır, sen kontrol edip kaydedersin. Word ve PDF dosyaları ayrı birer defter olur. Fotoğraflarda yalnızca İngilizce kelimeler okunur, Türkçelerini yapay zekâ kendisi bulur; bir fotoğraftaki yazılı Türkçe ya da tanımlar dikkate alınmaz.</p>
+  <div class="drop" id="drop"><p style="margin:0 0 12px;font-weight:600">Dosyaları buraya bırak ya da seç</p><input type="file" id="files" multiple accept=".docx,.pdf,image/*" onchange="doUpload(this.files)"></div>
   <div id="prev" style="margin-top:22px"></div>`;
   const d=$('#drop');d.ondragover=e=>{e.preventDefault();d.classList.add('over')};d.ondragleave=()=>d.classList.remove('over');d.ondrop=e=>{e.preventDefault();d.classList.remove('over');doUpload(e.dataTransfer.files)};
   if(PREV.length)renderPrev();
 }
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function shrink(f){return new Promise((res,rej)=>{const u=URL.createObjectURL(f),im=new Image();im.onload=()=>{const k=Math.min(1,1800/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',.85))};im.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('Fotoğraf açılamadı. JPG ya da PNG dene.'))};im.src=u})}
+async function aiRetry(path,body){for(let t=0;;t++){try{return await aiPost(path,body)}catch(e){if(/Çok hızlı/.test(e.message)&&t<3){await sleep(9000)}else throw e}}}
 async function doUpload(files){
-  if(!files.length)return;const fd=new FormData();[...files].forEach(f=>fd.append('files',f));
-  $('#prev').innerHTML='<p class="mut">Dosyalar okunuyor...</p>';
-  try{const r=await fetch('/api/parse',{method:'POST',body:fd});PREV=await r.json()}
-  catch(e){$('#prev').innerHTML='<p style="color:var(--red);font-weight:600">Sunucuya ulaşılamadı. İnternet bağlantını kontrol edip tekrar dene.</p>';return}
+  files=[...files];if(!files.length)return;
+  const docs=files.filter(f=>/\.(docx|pdf)$/i.test(f.name)),imgs=files.filter(f=>!docs.includes(f)&&(/^image\//.test(f.type)||/\.(png|jpe?g|webp)$/i.test(f.name))),other=files.filter(f=>!docs.includes(f)&&!imgs.includes(f));
+  const box=$('#prev');PREV=[];
+  if(docs.length){box.innerHTML='<p class="mut">Dosyalar okunuyor...</p>';
+    const fd=new FormData();docs.forEach(f=>fd.append('files',f));
+    try{PREV=await (await fetch('/api/parse',{method:'POST',body:fd})).json()}
+    catch(e){box.innerHTML='<p style="color:var(--red);font-weight:600">Sunucuya ulaşılamadı. İnternet bağlantını kontrol edip tekrar dene.</p>';return}}
+  other.forEach(f=>PREV.push({name:f.name,error:'Sadece .docx, .pdf ve fotoğraf (.jpg, .png) destekleniyor',words:[]}));
+  if(imgs.length){
+    if(!AI.on)PREV.push({name:'Fotoğraflar',error:'Fotoğraf okumak için yapay zekâ açık olmalı (sunucuda GEMINI_API_KEY tanımlı olmalı).',words:[]});
+    else{const words=[],seen=new Set();let fail=0,msg='';
+      for(let i=0;i<imgs.length;i++){
+        box.innerHTML=`<p class="mut think">Fotoğraf okunuyor ${i+1}/${imgs.length}<span>.</span><span>.</span><span>.</span></p>`;
+        try{const r=await aiRetry('/api/ai/photo',{image:await shrink(imgs[i])});
+          (r.words||[]).forEach(en=>{const k=en.toLowerCase();if(!seen.has(k)){seen.add(k);words.push({en,tr:'',ex:'',sec:'',ai:true})}})}
+        catch(e){fail++;msg=e.message}}
+      if(words.length)PREV.push({name:'Fotoğraf listesi',words,photo:true});
+      else PREV.push({name:'Fotoğraflar',error:msg||'Fotoğrafta İngilizce kelime bulunamadı.',words:[]});
+      if(fail&&words.length)toast(fail+' fotoğraf okunamadı');}
+  }
+  renderPrev();
+  const pi=PREV.findIndex(f=>f.photo);if(pi>=0)await findMeanings(pi);
+}
+const aiLabel=fi=>'İşaretlilerin anlamını yapay zekâ bulsun ('+PREV[fi].words.filter(w=>w.ai).length+')';
+function updAi(fi){const b=$('#aib'+fi);if(b&&!b.dataset.busy)b.textContent=aiLabel(fi)}
+function markAll(fi,v){PREV[fi].words.forEach(w=>w.ai=v);renderPrev()}
+function setTr(fi,wi,inp){const w=PREV[fi].words[wi],v=inp.value.trim(),tr=inp.closest('tr');w.tr=inp.value;
+  if(v){w.alts=[];tr.classList.remove('unsure');const c=tr.querySelector('.alts');if(c)c.remove()}
+  tr.classList.toggle('empty',!v&&!(w.alts&&w.alts.length))}
+function pickAlt(fi,wi,b){const inp=b.closest('tr').querySelector('input[aria-label="Türkçe"]');inp.value=b.dataset.v;setTr(fi,wi,inp)}
+async function findMeanings(fi){
+  const f=PREV[fi],todo=f.words.map((w,i)=>({w,i})).filter(x=>x.w.ai&&x.w.en.trim());
+  if(!todo.length){toast('Önce yapay zekânın bulacağı satırları işaretle');return}
+  if(!AI.on){toast('Yapay zekâ kapalı');return}
+  const b=$('#aib'+fi);if(b){b.disabled=true;b.dataset.busy=1}
+  let done=0;
+  for(let k=0;k<todo.length;k+=20){
+    const part=todo.slice(k,k+20);if(b)b.textContent='Anlamlar bulunuyor '+done+'/'+todo.length;
+    try{const r=await aiRetry('/api/ai/meanings',{words:part.map(x=>({id:String(x.i),en:x.w.en}))});
+      (r.items||[]).forEach(x=>{const w=f.words[+x.id];if(!w)return;w.ai=false;if(x.sure&&x.tr){w.tr=x.tr;w.alts=[]}else{w.tr='';w.alts=x.alts||[]}});
+    }catch(e){toast(e.message);break}
+    done+=part.length}
   renderPrev();
 }
 function renderPrev(){
   $('#prev').innerHTML=PREV.map((f,fi)=>`<div class="section" style="margin-top:22px">${f.error?`<h2 style="color:var(--red)">${esc(f.name)}</h2><p>${esc(f.error)}</p>`:`
   <div class="row"><h2 class="grow">${f.words.length} kelime bulundu</h2><label class="small mut" for="sn${fi}">Defter adı</label><input id="sn${fi}" type="text" style="max-width:300px" value="${esc(f.name)}" onchange="PREV[${fi}].name=this.value"></div>
-  <p class="small mut">Kırmızı satırlarda Türkçe karşılık bulunamadı. Doldur ya da sil, boş bırakırsan kaydedilmez.</p>
-  <div class="tbl" style="max-height:460px;overflow-y:auto"><table><tr><th>Bölüm</th><th>İngilizce</th><th>Türkçe</th><th>Örnek cümle</th><th></th></tr>
-  ${f.words.map((w,wi)=>`<tr class="${w.tr?'':'empty'}"><td class="mut">${esc(w.sec)}</td>
+  <p class="small mut">Kırmızı satır: Türkçe karşılık yok, doldur ya da sil. Sarı satır: yapay zekâ emin olamadı, seçeneklerden birine dokun. "YZ" kutusunu işaretlediğin satırların Türkçesini yapay zekâ yalnızca İngilizceye bakarak kendisi bulur ve satırdaki mevcut Türkçenin yerine yazar.</p>
+  <div class="row" style="margin:8px 0"><button class="btn line sm" onclick="markAll(${fi},true)">Hepsini işaretle</button><button class="btn line sm" onclick="markAll(${fi},false)">İşaretleri kaldır</button><button class="btn sm" id="aib${fi}" onclick="findMeanings(${fi})" ${AI.on?'':'disabled'}>${aiLabel(fi)}</button></div>
+  <div class="tbl" style="max-height:460px;overflow-y:auto"><table><tr><th>Bölüm</th><th>İngilizce</th><th>Türkçe</th><th title="Anlamı yapay zekâ bulsun">YZ</th><th>Örnek cümle</th><th></th></tr>
+  ${f.words.map((w,wi)=>`<tr class="${w.alts&&w.alts.length?'unsure':w.tr?'':'empty'}"><td class="mut">${esc(w.sec)}</td>
    <td><input type="text" aria-label="İngilizce" value="${esc(w.en)}" onchange="PREV[${fi}].words[${wi}].en=this.value"></td>
-   <td><input type="text" aria-label="Türkçe" value="${esc(w.tr)}" onchange="PREV[${fi}].words[${wi}].tr=this.value;this.closest('tr').classList.toggle('empty',!this.value.trim())"></td>
+   <td><input type="text" aria-label="Türkçe" value="${esc(w.tr)}" onchange="setTr(${fi},${wi},this)">${w.alts&&w.alts.length?`<div class="chips alts">${w.alts.map(a=>`<button class="chip" data-v="${esc(a)}" onclick="pickAlt(${fi},${wi},this)">${esc(a)}</button>`).join('')}</div>`:''}</td>
+   <td><input type="checkbox" aria-label="Anlamı yapay zekâ bulsun" ${w.ai?'checked':''} onchange="PREV[${fi}].words[${wi}].ai=this.checked;updAi(${fi})"></td>
    <td><input type="text" aria-label="Örnek" value="${esc(w.ex)}" onchange="PREV[${fi}].words[${wi}].ex=this.value"></td>
    <td><button class="btn warn sm" onclick="PREV[${fi}].words.splice(${wi},1);renderPrev()" aria-label="Satırı sil">Sil</button></td></tr>`).join('')}</table></div>`}</div>`).join('')+
   (PREV.some(f=>!f.error)?`<p style="margin-top:20px"><button class="btn big" onclick="savePrev()">Defterlere kaydet</button></p>`:'');
 }
 function savePrev(){
+  const un=PREV.filter(f=>!f.error).reduce((n,f)=>n+f.words.filter(w=>!(w.tr||'').trim()).length,0);if(un&&!confirm(un+' satırın Türkçesi boş, bunlar kaydedilmeyecek. Devam edilsin mi?'))return;
   let added=0,skipped=0;
   PREV.filter(f=>!f.error).forEach(f=>{
     const name=(f.name||'Defter').trim();let set=DB.sets.find(s=>s.name===name);
@@ -566,9 +613,9 @@ function flipCard(){
 function gradeNow(ok){if(S.lock)return;S.lock=true;sfx(ok?'ok':'bad',S.combo);applyGrade(ok,false);next()}
 function feedback(kind,w,gaveUp){
   if(S.lock)return;S.lock=true;const ok=kind==='ok',it=S.cur;applyGrade(ok,it.hinted&&ok);
-  const up=S.lvl;S.lvl=false;let msg;
+  const up=S.lvl;S.lvl=false;let msg;const cb=S.combo>=5&&S.combo%5===0;
   if(ok){
-    const syn=SYN&&SYN.id!==w.id?SYN:null,cb=S.combo>=5&&S.combo%5===0;
+    const syn=SYN&&SYN.id!==w.id?SYN:null;
     msg=`<b style="color:var(--green)">${cb?'Doğru, '+S.combo+' üst üste!':'Doğru.'}</b> <span class="hl" style="animation-delay:0s">${esc(w.en)}</span> = ${esc(w.tr)}`
      +(syn?`<div class="small mut">Yazdığın “${esc(syn.en)}” de aynı anlama geliyor, o da doğru. Sorulan kelime “${esc(w.en)}” idi.</div>`:'')
      +(it.hinted?'<div class="small mut">İpucu kullandığın için yarın tekrar gelecek.</div>':'')
@@ -579,7 +626,7 @@ function feedback(kind,w,gaveUp){
   const exh=w.ex?`<div class="ex" style="margin:8px 0 0">“${esc(w.ex)}”</div>`:'';
   if(ok){
     $('#fb').innerHTML=`<div class="fb ok">${msg}</div>`;
-    burst($('#fb'),up?38:cb?20:12);
+    try{burst($('#fb'),up?38:cb?20:12)}catch(e){}
     S.timer=setTimeout(next,up?1100:450);
   }else{
     const st=$('#stage');st.classList.remove('enter');st.classList.add('shake');setTimeout(()=>st.classList.remove('shake'),450);
