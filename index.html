@@ -136,6 +136,7 @@ details summary{cursor:pointer;font-weight:700}
  .method article{grid-template-columns:1fr;gap:4px}
 }
 /* ek animasyonlar */
+details.section>summary{cursor:pointer;padding:4px 0;font-size:17px}
 tr.unsure td{background:rgba(255,224,102,.2)}tr.unsure td input{border-color:#d99200}
 td .alts{margin:6px 0 0}td .chip{padding:2px 10px;font-size:13px}
 td input[type=checkbox]{width:20px;height:20px;padding:0}
@@ -183,6 +184,8 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const today=()=>Math.floor((Date.now()-new Date().getTimezoneOffset()*6e4)/864e5);
 const INT=[0,1,2,4,8,16,32];
 const KEY='kelime_atolyesi_v1';
+const LV=['A1','A2','B1','B2','C1','C2'],lvRank=w=>{const i=LV.indexOf(w.cefr);return i<0?6:i};
+function orderFresh(a){const g=new Map();a.forEach(w=>{if(!g.has(w.set))g.set(w.set,[]);g.get(w.set).push(w)});let o=[];g.forEach((ws,id)=>{const st=DB.sets.find(x=>x.id===id);o=o.concat(st&&st.lvlOrder?ws.map((w,i)=>[w,i]).sort((p,q)=>lvRank(p[0])-lvRank(q[0])||p[1]-q[1]).map(p=>p[0]):ws)});return o}
 let DB,VIEW='home',PREV=[],S=null,EDIT=null,LQ='',LSET='';
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
@@ -295,7 +298,7 @@ function render(){
 function stat(){
   const t=today(),pool=scope(),it=pool.filter(w=>w.intro);
   const due=it.filter(w=>w.due<=t).length;
-  const newLeft=Math.max(0,DB.newPerDay-DB.words.filter(w=>w.intro===t).length);
+  const newLeft=Math.max(0,DB.newPerDay-DB.words.filter(w=>w.intro===t&&!w.known).length);
   const fresh=pool.filter(w=>!w.intro).length;
   return{t,pool,due,fresh,newToday:Math.min(fresh,newLeft),
    lad:[pool.filter(w=>!w.intro).length,it.filter(w=>w.box<=1).length,it.filter(w=>w.box>=2&&w.box<4).length,it.filter(w=>w.box>=4).length],
@@ -331,8 +334,8 @@ function vHome(){
    <div class="fl">${s.fc.map((n,i)=>`<span>${i<2?dn[i]:new Intl.DateTimeFormat('tr-TR',{weekday:'short'}).format(new Date(Date.now()+i*864e5))}</span>`).join('')}</div></div>
 
   <div class="section"><h2>Hangi defterler çalışılsın?</h2>
-   <div class="list">${DB.sets.map(x=>{const ws=DB.words.filter(w=>w.set===x.id),k=ws.filter(w=>w.box>=4).length;return`<div class="setrow" onclick="toggleSel('${x.id}')"><span class="chk ${DB.sel.includes(x.id)?'on':''}"></span><span class="grow"><b>${esc(x.name)}</b><span class="mut small">${ws.length} kelime, ${k} pekişti</span></span></div>`}).join('')}</div>
-   <p class="small mut" style="margin:8px 0 0">Hiçbirini işaretlemezsen tüm kelimeler çalışılır.</p></div>
+   <div class="list">${DB.sets.map(x=>{const ws=DB.words.filter(w=>w.set===x.id),k=ws.filter(w=>w.box>=4).length;return`<div class="setrow" onclick="toggleSel('${x.id}')"><span class="chk ${DB.sel.includes(x.id)?'on':''}"></span><span class="grow"><b>${esc(x.name)}</b><span class="mut small">${ws.length} kelime, ${k} pekişti</span></span><button class="chip ${x.lvlOrder?'on':''}" title="Yeni kelimeleri kolaydan zora doğru öğret" onclick="event.stopPropagation();toggleOrder('${x.id}')">A1→C2</button></div>`}).join('')}</div>
+   <p class="small mut" style="margin:8px 0 0">Hiçbirini işaretlemezsen tüm kelimeler çalışılır. A1→C2 düğmesi açık olan defterde yeni kelimeler kolaydan zora doğru gelir.</p></div>
 
   <div class="section"><h2>Serbest pratik</h2>
    <div class="list">
@@ -347,44 +350,46 @@ function vHome(){
    <div class="row" style="margin-top:12px"><button class="btn line sm" onclick="exportDB()">Yedek indir</button><label class="btn line sm" style="cursor:pointer">Yedek yükle<input type="file" accept=".json" hidden onchange="importDB(this.files[0])"></label></div>
    <p class="small mut">İlerlemen bu cihazın tarayıcısında saklanır. Tarayıcı verisini silersen kaybolur, bu yüzden ara sıra yedek indir.</p></div></details></div>`;countUp();
 }
+function toggleOrder(id){const x=DB.sets.find(s=>s.id===id);x.lvlOrder=!x.lvlOrder;save();$('#app').className='';vHome()}
 function toggleSel(id){const i=DB.sel.indexOf(id);i<0?DB.sel.push(id):DB.sel.splice(i,1);save();$('#app').className='';vHome()}
 function exportDB(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB)],{type:'application/json'}));a.download='kelime-yedek-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
 function importDB(f){if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.words)throw 0;DB=d;load();save();toast('Yedek yüklendi');go('home')}catch(e){toast('Geçersiz yedek dosyası')}};r.readAsText(f)}
 
 /* ===== EKLE ===== */
 function vUpload(){
-  $('#app').innerHTML=`<h1>Kelime ekle</h1><p class="mut" style="max-width:560px;font-size:18px">Word (.docx), PDF ya da fotoğraf (.jpg, .png) yükle. Kelimeler ayıklanır, sen kontrol edip kaydedersin. Word ve PDF dosyaları ayrı birer defter olur. Fotoğraflarda yalnızca İngilizce kelimeler okunur, Türkçelerini yapay zekâ kendisi bulur; bir fotoğraftaki yazılı Türkçe ya da tanımlar dikkate alınmaz.</p>
+  $('#app').innerHTML=`<h1>Kelime ekle</h1><p class="mut" style="max-width:560px;font-size:18px">Word (.docx), PDF ya da fotoğraf (.jpg, .png) yükle, istediğin kadar dosyayı art arda ekleyebilirsin; hepsini tek defterde toplayabilirsin. Kelimeler ayıklanır, sen kontrol edip kaydedersin. Word ve PDF dosyaları ayrı birer defter olur. Fotoğraflarda yalnızca İngilizce kelimeler okunur, Türkçelerini yapay zekâ kendisi bulur; bir fotoğraftaki yazılı Türkçe ya da tanımlar dikkate alınmaz.</p>
   <div class="drop" id="drop"><p style="margin:0 0 12px;font-weight:600">Dosyaları buraya bırak ya da seç</p><input type="file" id="files" multiple accept=".docx,.pdf,image/*" onchange="doUpload(this.files)"></div>
-  <div id="prev" style="margin-top:22px"></div>`;
+  <div id="upmsg" class="mut" style="margin-top:14px"></div><div id="prev" style="margin-top:8px"></div>`;
   const d=$('#drop');d.ondragover=e=>{e.preventDefault();d.classList.add('over')};d.ondragleave=()=>d.classList.remove('over');d.ondrop=e=>{e.preventDefault();d.classList.remove('over');doUpload(e.dataTransfer.files)};
   if(PREV.length)renderPrev();
 }
+let MERGE=true,MNAME='',SAVING=false;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function shrink(f){return new Promise((res,rej)=>{const u=URL.createObjectURL(f),im=new Image();im.onload=()=>{const k=Math.min(1,1800/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',.85))};im.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('Fotoğraf açılamadı. JPG ya da PNG dene.'))};im.src=u})}
 async function aiRetry(path,body){for(let t=0;;t++){try{return await aiPost(path,body)}catch(e){if(/Çok hızlı/.test(e.message)&&t<3){await sleep(9000)}else throw e}}}
 async function doUpload(files){
   files=[...files];if(!files.length)return;
   const docs=files.filter(f=>/\.(docx|pdf)$/i.test(f.name)),imgs=files.filter(f=>!docs.includes(f)&&(/^image\//.test(f.type)||/\.(png|jpe?g|webp)$/i.test(f.name))),other=files.filter(f=>!docs.includes(f)&&!imgs.includes(f));
-  const box=$('#prev');PREV=[];
-  if(docs.length){box.innerHTML='<p class="mut">Dosyalar okunuyor...</p>';
+  const msg=t=>{const m=$('#upmsg');if(m)m.innerHTML=t};
+  if(docs.length){msg('Dosyalar okunuyor...');
     const fd=new FormData();docs.forEach(f=>fd.append('files',f));
-    try{PREV=await (await fetch('/api/parse',{method:'POST',body:fd})).json()}
-    catch(e){box.innerHTML='<p style="color:var(--red);font-weight:600">Sunucuya ulaşılamadı. İnternet bağlantını kontrol edip tekrar dene.</p>';return}}
+    try{PREV.push(...await (await fetch('/api/parse',{method:'POST',body:fd})).json())}
+    catch(e){msg('<span style="color:var(--red);font-weight:600">Sunucuya ulaşılamadı. İnternet bağlantını kontrol edip tekrar dene.</span>');return}}
   other.forEach(f=>PREV.push({name:f.name,error:'Sadece .docx, .pdf ve fotoğraf (.jpg, .png) destekleniyor',words:[]}));
   if(imgs.length){
     if(!AI.on)PREV.push({name:'Fotoğraflar',error:'Fotoğraf okumak için yapay zekâ açık olmalı (sunucuda GEMINI_API_KEY tanımlı olmalı).',words:[]});
-    else{const words=[],seen=new Set();let fail=0,msg='';
+    else{const pe=PREV.find(f=>f.photo),seen=new Set(pe?pe.words.map(w=>w.en.toLowerCase()):[]),fresh=[];let fail=0,err='';
       for(let i=0;i<imgs.length;i++){
-        box.innerHTML=`<p class="mut think">Fotoğraf okunuyor ${i+1}/${imgs.length}<span>.</span><span>.</span><span>.</span></p>`;
+        msg(`<span class="think">Fotoğraf okunuyor ${i+1}/${imgs.length}<span>.</span><span>.</span><span>.</span></span>`);
         try{const r=await aiRetry('/api/ai/photo',{image:await shrink(imgs[i])});
-          (r.words||[]).forEach(en=>{const k=en.toLowerCase();if(!seen.has(k)){seen.add(k);words.push({en,tr:'',ex:'',sec:'',ai:true})}})}
-        catch(e){fail++;msg=e.message}}
-      if(words.length)PREV.push({name:'Fotoğraf listesi',words,photo:true});
-      else PREV.push({name:'Fotoğraflar',error:msg||'Fotoğrafta İngilizce kelime bulunamadı.',words:[]});
-      if(fail&&words.length)toast(fail+' fotoğraf okunamadı');}
+          (r.words||[]).forEach(x=>{x=typeof x==='string'?{en:x}:x;const en=String(x.en||'').trim(),k=en.toLowerCase();if(en&&!seen.has(k)){seen.add(k);fresh.push({en,def:x.def||'',tr:'',ex:'',sec:'',ai:true})}})}
+        catch(e){fail++;err=e.message}}
+      if(fresh.length){if(pe)pe.words.push(...fresh);else PREV.push({name:'Fotoğraf listesi',words:fresh,photo:true})}
+      else if(!pe)PREV.push({name:'Fotoğraflar',error:err||'Fotoğrafta yeni İngilizce kelime bulunamadı.',words:[]});
+      if(fail&&fresh.length)toast(fail+' fotoğraf okunamadı')}
   }
-  renderPrev();
-  const pi=PREV.findIndex(f=>f.photo);if(pi>=0)await findMeanings(pi);
+  msg('');renderPrev();
+  const pe=PREV.find(f=>f.photo);if(pe)await findMeanings(PREV.indexOf(pe));
 }
 const aiLabel=fi=>'İşaretlilerin anlamını yapay zekâ bulsun ('+PREV[fi].words.filter(w=>w.ai).length+')';
 function updAi(fi){const b=$('#aib'+fi);if(b&&!b.dataset.busy)b.textContent=aiLabel(fi)}
@@ -401,38 +406,64 @@ async function findMeanings(fi){
   let done=0;
   for(let k=0;k<todo.length;k+=20){
     const part=todo.slice(k,k+20);if(b)b.textContent='Anlamlar bulunuyor '+done+'/'+todo.length;
-    try{const r=await aiRetry('/api/ai/meanings',{words:part.map(x=>({id:String(x.i),en:x.w.en}))});
+    try{const r=await aiRetry('/api/ai/meanings',{words:part.map(x=>({id:String(x.i),en:x.w.en,def:x.w.def||''}))});
       (r.items||[]).forEach(x=>{const w=f.words[+x.id];if(!w)return;w.ai=false;if(x.sure&&x.tr){w.tr=x.tr;w.alts=[]}else{w.tr='';w.alts=x.alts||[]}});
     }catch(e){toast(e.message);break}
     done+=part.length}
   renderPrev();
 }
+async function levelLookup(list){const r=await aiPost('/api/levels',{words:[...new Set(list)]});return r.levels||{}}
+async function assignLevels(manual){
+  const need=DB.words.filter(w=>!w.cefr);if(!need.length){if(manual)toast('Tüm kelimelerin seviyesi var');return}
+  let n=0;
+  try{const m=await levelLookup(need.map(w=>w.en));need.forEach(w=>{if(m[w.en]){w.cefr=m[w.en];w.cefrSrc='list';n++}});save()}catch(e){}
+  const rest=DB.words.filter(w=>!w.cefr);
+  if(AI.on&&rest.length){
+    for(let k=0;k<rest.length&&k<200;k+=40){
+      try{const r=await aiRetry('/api/ai/levels',{words:rest.slice(k,k+40).map(w=>({id:w.id,en:w.en,tr:w.tr}))});
+        (r.items||[]).forEach(x=>{const w=byId(x.id);if(w&&LV.includes(x.level)){w.cefr=x.level;w.cefrSrc='ai';n++}});save()}
+      catch(e){if(manual)toast(e.message);break}}}
+  if(manual||n)toast(n+' kelimeye seviye eklendi');
+  if(VIEW==='lib')vLib();
+}
 function renderPrev(){
-  $('#prev').innerHTML=PREV.map((f,fi)=>`<div class="section" style="margin-top:22px">${f.error?`<h2 style="color:var(--red)">${esc(f.name)}</h2><p>${esc(f.error)}</p>`:`
-  <div class="row"><h2 class="grow">${f.words.length} kelime bulundu</h2><label class="small mut" for="sn${fi}">Defter adı</label><input id="sn${fi}" type="text" style="max-width:300px" value="${esc(f.name)}" onchange="PREV[${fi}].name=this.value"></div>
-  <p class="small mut">Kırmızı satır: Türkçe karşılık yok, doldur ya da sil. Sarı satır: yapay zekâ emin olamadı, seçeneklerden birine dokun. "YZ" kutusunu işaretlediğin satırların Türkçesini yapay zekâ yalnızca İngilizceye bakarak kendisi bulur ve satırdaki mevcut Türkçenin yerine yazar.</p>
-  <div class="row" style="margin:8px 0"><button class="btn line sm" onclick="markAll(${fi},true)">Hepsini işaretle</button><button class="btn line sm" onclick="markAll(${fi},false)">İşaretleri kaldır</button><button class="btn sm" id="aib${fi}" onclick="findMeanings(${fi})" ${AI.on?'':'disabled'}>${aiLabel(fi)}</button></div>
+  if(!$('#prev'))return;
+  const ok=PREV.filter(f=>!f.error),many=ok.length>1,tot=ok.reduce((n,f)=>n+f.words.length,0);
+  const top=many?`<div class="row" style="margin:6px 0 0"><label class="row small" style="gap:8px"><input type="checkbox" ${MERGE?'checked':''} onchange="MERGE=this.checked;renderPrev()"> <b>Hepsini tek defterde topla</b> <span class="mut">(${ok.length} dosya, ${tot} kelime)</span></label>${MERGE?`<span class="grow"></span><label class="small mut" for="mname">Defter adı</label><input id="mname" list="setnames" type="text" style="max-width:300px" value="${esc(MNAME||ok[0].name)}" onchange="MNAME=this.value">`:''}</div>`:'';
+  $('#prev').innerHTML=top+'<datalist id="setnames">'+DB.sets.map(s=>`<option value="${esc(s.name)}">`).join('')+'</datalist>'+PREV.map((f,fi)=>{
+    if(f.error)return`<div class="section" style="margin-top:22px"><h2 style="color:var(--red)">${esc(f.name)}</h2><p>${esc(f.error)}</p></div>`;
+    const bad=f.words.filter(w=>!w.tr&&!(w.alts&&w.alts.length)).length,un=f.words.filter(w=>w.alts&&w.alts.length).length,op=f.open!==undefined?f.open:PREV.length<=2;
+    return`<details class="section" style="margin-top:22px" ${op?'open':''} ontoggle="PREV[${fi}].open=this.open"><summary><b>${esc(f.name)}</b> <span class="mut small">${f.words.length} kelime${un?', '+un+' sarı':''}${bad?', '+bad+' kırmızı':''}</span></summary>
+  ${many&&MERGE?'':`<div class="row" style="margin-top:10px"><span class="grow"></span><label class="small mut" for="sn${fi}">Defter adı</label><input id="sn${fi}" list="setnames" type="text" style="max-width:300px" value="${esc(f.name)}" onchange="PREV[${fi}].name=this.value"></div>`}
+  <p class="small mut" style="margin:10px 0 0">Kırmızı satır: Türkçe yok, doldur ya da sil. Sarı satır: yapay zekâ emin olamadı, seçeneklerden birine dokun. "YZ" kutusunu işaretlediğin satırların Türkçesini yapay zekâ İngilizceye (varsa tanıma) bakarak bulur ve eski Türkçenin yerine yazar.</p>
+  <div class="row" style="margin:8px 0"><button class="btn line sm" onclick="markAll(${fi},true)">Hepsini işaretle</button><button class="btn line sm" onclick="markAll(${fi},false)">İşaretleri kaldır</button><button class="btn sm" id="aib${fi}" onclick="findMeanings(${fi})" ${AI.on?'':'disabled'}>${aiLabel(fi)}</button><span class="grow"></span><button class="btn warn sm" onclick="PREV.splice(${fi},1);renderPrev()">Dosyayı çıkar</button></div>
   <div class="tbl" style="max-height:460px;overflow-y:auto"><table><tr><th>Bölüm</th><th>İngilizce</th><th>Türkçe</th><th title="Anlamı yapay zekâ bulsun">YZ</th><th>Örnek cümle</th><th></th></tr>
   ${f.words.map((w,wi)=>`<tr class="${w.alts&&w.alts.length?'unsure':w.tr?'':'empty'}"><td class="mut">${esc(w.sec)}</td>
-   <td><input type="text" aria-label="İngilizce" value="${esc(w.en)}" onchange="PREV[${fi}].words[${wi}].en=this.value"></td>
+   <td><input type="text" aria-label="İngilizce" value="${esc(w.en)}" onchange="PREV[${fi}].words[${wi}].en=this.value">${w.def?`<div class="small mut" style="margin-top:4px">${esc(w.def)}</div>`:''}</td>
    <td><input type="text" aria-label="Türkçe" value="${esc(w.tr)}" onchange="setTr(${fi},${wi},this)">${w.alts&&w.alts.length?`<div class="chips alts">${w.alts.map(a=>`<button class="chip" data-v="${esc(a)}" onclick="pickAlt(${fi},${wi},this)">${esc(a)}</button>`).join('')}</div>`:''}</td>
    <td><input type="checkbox" aria-label="Anlamı yapay zekâ bulsun" ${w.ai?'checked':''} onchange="PREV[${fi}].words[${wi}].ai=this.checked;updAi(${fi})"></td>
    <td><input type="text" aria-label="Örnek" value="${esc(w.ex)}" onchange="PREV[${fi}].words[${wi}].ex=this.value"></td>
-   <td><button class="btn warn sm" onclick="PREV[${fi}].words.splice(${wi},1);renderPrev()" aria-label="Satırı sil">Sil</button></td></tr>`).join('')}</table></div>`}</div>`).join('')+
-  (PREV.some(f=>!f.error)?`<p style="margin-top:20px"><button class="btn big" onclick="savePrev()">Defterlere kaydet</button></p>`:'');
+   <td><button class="btn warn sm" onclick="PREV[${fi}].words.splice(${wi},1);renderPrev()" aria-label="Satırı sil">Sil</button></td></tr>`).join('')}</table></div></details>`}).join('')+
+  (ok.length?`<p style="margin-top:20px"><button class="btn big" onclick="savePrev()">Defterlere kaydet</button></p>`:'');
 }
-function savePrev(){
-  const un=PREV.filter(f=>!f.error).reduce((n,f)=>n+f.words.filter(w=>!(w.tr||'').trim()).length,0);if(un&&!confirm(un+' satırın Türkçesi boş, bunlar kaydedilmeyecek. Devam edilsin mi?'))return;
+async function savePrev(){
+  if(SAVING)return;
+  const ok=PREV.filter(f=>!f.error);
+  const un=ok.reduce((n,f)=>n+f.words.filter(w=>!(w.tr||'').trim()).length,0);if(un&&!confirm(un+' satırın Türkçesi boş, bunlar kaydedilmeyecek. Devam edilsin mi?'))return;
+  SAVING=true;
+  const many=ok.length>1&&MERGE,mname=(MNAME||(ok[0]&&ok[0].name)||'Defter').trim()||'Defter';
+  let map={};try{map=await levelLookup(ok.flatMap(f=>f.words.map(w=>(w.en||'').trim())))}catch(e){}
   let added=0,skipped=0;
-  PREV.filter(f=>!f.error).forEach(f=>{
-    const name=(f.name||'Defter').trim();let set=DB.sets.find(s=>s.name===name);
+  ok.forEach(f=>{
+    const name=(many?mname:(f.name||'Defter')).trim()||'Defter';let set=DB.sets.find(s=>s.name===name);
     if(!set){set={id:uid(),name};DB.sets.push(set)}
     f.words.forEach(w=>{const en=(w.en||'').trim(),tr=(w.tr||'').trim();
       if(!en||!tr){skipped++;return}
       if(DB.words.some(x=>x.set===set.id&&x.en.toLowerCase()===en.toLowerCase()&&x.tr.toLowerCase()===tr.toLowerCase()))return;
-      DB.words.push({id:uid(),en,tr,ex:(w.ex||'').trim(),sec:w.sec||'',set:set.id,note:'',box:0,due:0,intro:0,ok:0,bad:0,seen:0});added++});
+      DB.words.push({id:uid(),en,tr,ex:(w.ex||'').trim(),def:(w.def||'').trim(),cefr:map[en]||'',cefrSrc:map[en]?'list':'',sec:w.sec||'',set:set.id,note:'',box:0,due:0,intro:0,ok:0,bad:0,seen:0});added++});
   });
-  save();PREV=[];toast(added+' kelime eklendi'+(skipped?', '+skipped+' boş satır atlandı':''));go('home');
+  save();PREV=[];MNAME='';SAVING=false;toast(added+' kelime eklendi'+(skipped?', '+skipped+' boş satır atlandı':''));go('home');
+  assignLevels(false);
 }
 
 /* ===== DEFTER ===== */
@@ -441,14 +472,14 @@ function vLib(){
   <div class="row" style="margin:14px 0"><input type="text" placeholder="Kelime ara" aria-label="Ara" value="${esc(LQ)}" style="max-width:260px" oninput="LQ=this.value;libRows()">
   <select aria-label="Defter" style="max-width:240px" onchange="LSET=this.value;libRows()"><option value="">Tüm defterler</option>${DB.sets.map(s=>`<option value="${s.id}" ${LSET===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
   <div class="chips">${DB.sets.map(s=>`<span class="chip" style="cursor:default">${esc(s.name)} <a href="#" onclick="renameSet('${s.id}');return false" aria-label="Yeniden adlandır">Adı değiştir</a> <a href="#" style="color:var(--red)" onclick="delSet('${s.id}');return false">Sil</a></span>`).join('')}</div>
-  ${AI.on?'<p><button class="btn line sm" id="aiEx" onclick="aiFillLib()">Eksik örnek cümleleri yapay zekâyla üret (12 kelime)</button></p>':''}<div class="tbl"><table id="ltab"></table></div>
+  ${AI.on?'<p><button class="btn line sm" id="aiEx" onclick="aiFillLib()">Eksik örnek cümleleri yapay zekâyla üret (12 kelime)</button></p>':''}${DB.words.some(w=>!w.cefr)?`<p><button class="btn line sm" onclick="assignLevels(true)">Seviyesi olmayan ${DB.words.filter(w=>!w.cefr).length} kelimenin seviyesini bul</button></p>`:''}<div class="tbl"><table id="ltab"></table></div>
   <div class="section"><h2>Kendi kelimeni ekle</h2><div class="row"><input type="text" id="nen" aria-label="İngilizce" placeholder="İngilizce" style="flex:1;min-width:140px"><input type="text" id="ntr" aria-label="Türkçe" placeholder="Türkçe" style="flex:1;min-width:140px"><input type="text" id="nex" aria-label="Örnek cümle" placeholder="Örnek cümle (isteğe bağlı)" style="flex:2;min-width:200px"><button class="btn" onclick="addWord()">Ekle</button></div></div>`;libRows();
 }
 function lvl(w){return!w.intro?'<span class="tag n">Yeni</span>':w.box<=1?'<span class="tag l">Öğreniliyor</span>':w.box<4?'<span class="tag m">Pekişiyor</span>':'<span class="tag k">Pekişti</span>'}
 function libRows(){
   const q=LQ.toLowerCase();const ws=DB.words.filter(w=>(!LSET||w.set===LSET)&&(!q||w.en.toLowerCase().includes(q)||w.tr.toLowerCase().includes(q)));
   $('#ltab').innerHTML='<tr><th>İngilizce</th><th>Türkçe</th><th>Durum</th><th></th></tr>'+ws.slice(0,300).map(w=>EDIT===w.id?`<tr><td><input type="text" id="ee" value="${esc(w.en)}"></td><td><input type="text" id="et" value="${esc(w.tr)}"></td><td colspan="2" style="white-space:nowrap"><button class="btn sm" onclick="saveEdit('${w.id}')">Kaydet</button> <button class="btn line sm" onclick="EDIT=null;libRows()">Vazgeç</button></td></tr>`:
-  `<tr><td><b>${esc(w.en)}</b> <a href="#" onclick="say(byId('${w.id}').en);return false" aria-label="Dinle">${speaker}</a>${w.note?`<div class="note">${esc(w.note)}</div>`:''}</td><td>${esc(w.tr)}</td><td>${lvl(w)}</td>
+  `<tr><td><b>${esc(w.en)}</b> <a href="#" onclick="say(byId('${w.id}').en);return false" aria-label="Dinle">${speaker}</a>${w.cefr?` <span class="tag" title="${w.cefrSrc==='ai'?'Yapay zekâ tahmini':'CEFR listesi'}">${w.cefrSrc==='ai'?'~':''}${w.cefr}</span>`:''}${w.note?`<div class="note">${esc(w.note)}</div>`:''}</td><td>${esc(w.tr)}</td><td>${lvl(w)}</td>
    <td style="white-space:nowrap"><button class="btn line sm" onclick="EDIT='${w.id}';libRows()">Düzenle</button> <button class="btn warn sm" onclick="delWord('${w.id}')">Sil</button></td></tr>`).join('')+(ws.length>300?'<tr><td colspan="4" class="mut">İlk 300 kelime gösteriliyor. Aramayı daralt.</td></tr>':'')+(!ws.length?'<tr><td colspan="4" class="mut">Eşleşen kelime yok.</td></tr>':'');
 }
 function saveEdit(id){const w=byId(id),e=$('#ee').value.trim(),t=$('#et').value.trim();if(!e||!t){toast('İki alan da dolu olmalı');return}w.en=e;w.tr=t;EDIT=null;save();libRows()}
@@ -468,7 +499,8 @@ function vMethod(){
   ['Yazarak üretme','İlk karşılaşmada kelimeyi sadece görmek yetmez. Önce bakarak, sonra bakmadan yazmak kelimeyi aktif üretmeni sağlar; üretme etkisi (Slamecka ve Graf, 1978) bunu destekler. Kaç kez yazman gerektiğinin tek bir doğru sayısı yok, bu yüzden ayarlardan değiştirebilirsin.','Sitede: yeni kelimede önce bakarak, sonra bakmadan birkaç kez yazarsın.'],
   ['Zorlaşan sorular','Tanımak, üretmekten kolaydır. Kelimeyi yazmak ve duyduğunu yazmak, daha çok emek gerektirdiği için daha kalıcı iz bırakır (Bjork ve Bjork, "istenen zorluklar").','Sitede: yeni kelime seçmeli başlar; bildikçe yazma, cümlede tamamlama ve dinleyip yazmaya geçer.'],
   ['Karışık çalışma','Konuları ve soru türlerini karıştırmak, tek türü bloklar halinde çalışmaktan daha iyi sonuç verir (Brunmair ve Richter, 2019; g = 0,42).','Sitede: tüm defterlerden kelimeler ve farklı soru türleri karışık gelir.'],
-  ['Kendi hafıza bağın','Görsel ya da ses benzerliğine dayanan ipuçları ilk günlerde hatırlamayı kolaylaştırır, ancak tekrar edilmezse hızlı unutulur (Wang ve Thomas, 1992-1995). Öğrencilerin kendi ürettiği ipuçları hazır verilenlerden daha iyi sonuç verdi (ETR&D, 2004). Bu yüzden ipucu yalnızca başlangıç desteğidir, asıl iş tekrarlardır.','Sitede: yeni kelimede kendi ipucunu yazarsın, ama kelimeler ipucundan bağımsız olarak aralıklı sorulur.']];
+  ['Kendi hafıza bağın','Görsel ya da ses benzerliğine dayanan ipuçları ilk günlerde hatırlamayı kolaylaştırır, ancak tekrar edilmezse hızlı unutulur (Wang ve Thomas, 1992-1995). Öğrencilerin kendi ürettiği ipuçları hazır verilenlerden daha iyi sonuç verdi (ETR&D, 2004). Bu yüzden ipucu yalnızca başlangıç desteğidir, asıl iş tekrarlardır.','Sitede: yeni kelimede kendi ipucunu yazarsın, ama kelimeler ipucundan bağımsız olarak aralıklı sorulur.'],
+  ['Kelime seviyeleri','Seviyeler CEFR-J Vocabulary Profile 1.5 (A1-B2; Tono Laboratory, Tokyo University of Foreign Studies) ve Octanove Vocabulary Profile C1/C2 1.0 (CC BY-SA 4.0) listelerinden alınır. Listede olmayan kelimeler, özellikle deyimler, yapay zekâyla tahmin edilir ve ~ işaretiyle gösterilir. Seviyeler yaklaşık bir yol göstericidir: bir kelimenin farklı anlamları farklı seviyelerde olabilir.','Sitede: bir defterde A1→C2 düğmesini açarsan yeni kelimeler kolaydan zora doğru öğretilir.']];
   $('#app').innerHTML=`<h1>Bu site nasıl çalışıyor?</h1><p class="mut" style="max-width:600px;font-size:18px">Kelime Defteri, öğrenme bilimindeki en sağlam bulgulara göre kuruldu. Hile yok: kısa ve düzenli çalışma, her seferinde hatırlamaya çalışma.</p>
   <div class="method" style="margin-top:20px">${A.map(a=>`<article><h3>${a[0]}</h3><div><p style="margin:0 0 6px">${a[1]}</p><p class="small" style="margin:0;color:var(--bt);font-weight:600">${a[2]}</p></div></article>`).join('')}</div>
   <p class="small mut">Günde 10-15 dakika, haftada 5-6 gün çoğu zaman tek seferde 2 saat çalışmaktan daha etkilidir. Sınavdan önceki gece değil, her gün.</p>`;
@@ -486,8 +518,8 @@ function stage(html){
 function startSmart(){
   const pool=scope(),t=today();
   const due=pool.filter(w=>w.intro&&w.due<=t).sort((a,b)=>a.due-b.due||a.box-b.box).slice(0,40);
-  const left=Math.max(0,DB.newPerDay-DB.words.filter(w=>w.intro===t).length);
-  const fresh=pool.filter(w=>!w.intro).slice(0,left);
+  const left=Math.max(0,DB.newPerDay-DB.words.filter(w=>w.intro===t&&!w.known).length);
+  const fresh=orderFresh(pool.filter(w=>!w.intro)).slice(0,left);
   if(!due.length&&!fresh.length){toast('Bugünlük hepsi tamam. Serbest pratik yapabilirsin.');return}
   const batches=[];for(let i=0;i<fresh.length;i+=5)batches.push(fresh.slice(i,i+5).map(w=>w.id));
   if(AI.on)prefetchEx(due.filter(w=>w.box>=2&&!w.ex).map(w=>w.id));
@@ -519,14 +551,18 @@ const PROMPTS={g:'Kelimeyi gözünde canlandır. Anlamıyla ilgili somut bir sah
 function noteBox(w,open){return`<div style="margin-top:14px"><div class="chips" role="group" aria-label="Hafıza bağı türü">${[['g','Görüntü'],['s','Ses benzerliği'],['c','Kendi cümlem']].map(p=>`<button class="chip" onclick="document.getElementById('np').textContent=PROMPTS['${p[0]}'];document.getElementById('nt').focus()">${p[1]}</button>`).join('')}</div>
  <div class="small mut" id="np">Kendi bulduğun bağlantı, hazır olandan daha kalıcıdır. İstersen aşağıya bir ipucu yaz.</div>
  <textarea id="nt" rows="2" aria-label="Hafıza ipucu" oninput="byId('${w.id}').note=this.value;save()" style="margin-top:6px">${esc(w.note||'')}</textarea></div>`}
-function renderIntro(w){
+function renderIntro(w){S.introAt=Date.now();
   say(w.en);
-  stage(`<div class="q">Yeni kelime, ${S.intros.length} kaldı</div><div class="word"><span class="hl">${esc(w.en)}</span></div>
+  stage(`<div class="q">Yeni kelime, ${S.intros.length} kaldı ${w.cefr?`<span class="tag" title="${w.cefrSrc==='ai'?'Yapay zekâ tahmini':'CEFR listesi'}">${w.cefrSrc==='ai'?'~':''}${w.cefr}</span>`:''}</div><div class="word"><span class="hl">${esc(w.en)}</span></div>
   <div class="row"><button class="btn line sm" onclick="say(byId('${w.id}').en)">${speaker} Dinle</button><button class="btn line sm" onclick="say(byId('${w.id}').en,.55)">Yavaş dinle</button></div>
-  <div class="tr" style="margin-top:14px">${esc(w.tr)}</div><div id="exbox">${exHTML(w)}</div>
+  <div class="tr" style="margin-top:14px">${esc(w.tr)}</div>${w.def?`<p class="small mut" style="margin:0 0 8px">${esc(w.def)}</p>`:''}<div id="exbox">${exHTML(w)}</div>
   <p class="small mut" style="margin:6px 0">Kelimeyi bir kez yüksek sesle söyle ve anlamını zihninde canlandır. Sonra turda seni test edeceğim.</p>
-  ${noteBox(w)}<p style="margin:16px 0 0"><button class="btn big" id="nextBtn" onclick="introDone()">Devam</button></p>`);
+  ${noteBox(w)}<p class="row" style="margin:16px 0 0"><button class="btn big" id="nextBtn" onclick="introDone()">Öğrenmeye başla</button><button class="btn line big" onclick="knowIt()">Biliyorum, atla</button></p>`);
 }
+function knowIt(){
+  if(Date.now()-(S.introAt||0)<600)return;
+  const id=S.intros.shift(),w=byId(id);if(!w)return next();
+  w.intro=today();w.box=4;w.due=today()+INT[4];w.known=1;save();S.known=(S.known||0)+1;next()}
 function introDone(){const id=S.intros.shift(),w=byId(id);w.intro=today();w.due=today();save();S.q.push({id,fails:0,isNew:true,need:3,stage:0});if(DB.writeN>0){S.wr={id,n:0,total:DB.writeN};renderWrite()}else next()}
 function renderWrite(){
   const W=S.wr,w=byId(W.id),vis=Math.ceil(W.total*.6),show=W.n<vis;W.h=0;
@@ -650,7 +686,7 @@ function finish(){
   const tot=S.okN+S.badN,pct=tot?Math.round(S.okN/tot*100):0,t=today();
   const miss=[...S.missed].map(byId).filter(Boolean),tom=DB.words.filter(w=>w.intro&&w.due===t+1).length;
   stage(`<h1 style="margin-bottom:12px">Tur bitti</h1>${tot?`<div class="stats"><div><b>%${pct}</b><span class="mut">doğruluk</span></div><div><b>${S.okN}</b><span class="mut">doğru</span></div><div><b>${S.badN}</b><span class="mut">yanlış</span></div></div>`:'<p class="mut">Bu turda soru cevaplanmadı.</p>'}
-  ${tom?`<p class="mut">Yarın ${tom} kelime tekrar için sırada.</p>`:''}
+  ${tom?`<p class="mut">Yarın ${tom} kelime tekrar için sırada.</p>`:''}${S.known?`<p class="mut">Bildiğin ${S.known} kelimeyi atladın, bunlar 8 gün sonra tekrar karşına çıkacak.</p>`:''}
   ${miss.length?`<h3 style="margin-top:16px">Takıldığın kelimeler</h3><div class="tbl"><table>${miss.map(w=>`<tr><td><b>${esc(w.en)}</b> <a href="#" onclick="say(byId('${w.id}').en);return false" aria-label="Dinle">${speaker}</a></td><td>${esc(w.tr)}</td></tr>`).join('')}</table></div>`:(tot?'<p style="font-weight:600">Hiç yanlışın yok.</p>':'')}
   <div class="row" style="margin-top:18px"><button class="btn" onclick="go('home')">Ana sayfa</button>${S.mode==='match'?'<button class="btn line" onclick="startMatch()">Tekrar oyna</button>':S.mode!=='smart'?`<button class="btn line" onclick="startPractice('${S.mode}')">Bir tur daha</button>`:''}</div>`);
   $('#nav').innerHTML='';sfx('done');if(pct>=70)setTimeout(()=>burst($('#stage'),44),250);
